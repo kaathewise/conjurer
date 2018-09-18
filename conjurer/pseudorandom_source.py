@@ -22,7 +22,7 @@ def get_seed_argon2(passphrase):
     return argon2_hash(passphrase, passphrase, t=4096, m=16, buflen=64)
 
 
-class FastPseudorandom:
+class _FastPseudorandom:
     """
     Given a seed, creates a fast deterministic stream of bytes.
 
@@ -39,7 +39,7 @@ class FastPseudorandom:
     4. Preserves the enthropy given (up to 64 bytes).
     """
 
-    def __init__(self, seed, hash=lambda x: SHA3_512.new(data = x).digest()):
+    def __init__(self, seed, hash=lambda x: SHA3_512.new(data=x).digest()):
         self.__seed = seed
         self.__buf = seed
         self.__hash = hash

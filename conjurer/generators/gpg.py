@@ -6,33 +6,16 @@ import tempfile
 from absl import flags
 
 FLAGS = flags.FLAGS
-flags.DEFINE_enum(
-    'gpg_mode', 'pem', ['pem', 'gpg', 'decrypt', 'encrypt'],
-    '''The way generated GPG is used:
-    pem -- is exported in PEM format
-    encrypt -- used to encrypt STDIN
-    decrypt -- used to decrypt STDIN''')
-
-_modes = {
-    'pem': _get_pem,
-    'gpg': _get_gpg,
-    'decrypt': lambda key: _run_gpg_with_key(key, '--decrypt'),
-    'encrypt': lambda key: _run_gpg_with_key(key, '--encrypt')
-}
 
 
-def generate(random_source):
-    from Crypto.PublicKey import RSA
-    key = RSA.generate(4096, random_source)
-    return _modes[FLAGS.gpg_mode](key)
+def get_pem(source, *args):
+    """Generate an RSA pair and export it in PEM format."""
+    return _get_key(source).export_key(format='PEM')
 
 
-def _get_pem(key):
-    return key.export_key(format='PEM')
-
-
-def _get_gpg(key):
-    pem = _get_pem(key)
+def get_gpg_key(source, *args):
+    """Generate an RSA pair and export it in GPG format."""
+    pem = get_pem(source)
     my_env = os.environ.copy()
     my_env['PEM2OPENPGP_TIMESTAMP'] = '0'
     my_env['PEM2OPENPGP_USAGE_FLAGS'] = 'certify,sign,encrypt,authenticate'
@@ -44,19 +27,42 @@ def _get_gpg(key):
     return pem2openpgp.communicate(pem)[0]
 
 
-def _run_gpg_with_key(key, cmd):
-    gpg_key = _get_gpg(key)
+def get_public_key(source, *args):
+    """Generate an (RSA) GPG key and export the public key in ASCII."""
+    return _run_gpg_with_source(source, None,
+                                ['--armor', '--export', FLAGS.id])
+
+
+def encrypt(source, buf):
+    """Generate an (RSA) GPG key and use it to encrypt STDIN to STDOUT."""
+    return _run_gpg_with_source(source, buf, [
+        '--encrypt', '--recipient', FLAGS.id, '--trust-model', 'always',
+        '--armor'
+    ])
+
+
+def decrypt(source, buf):
+    """Generate an (RSA) GPG key and use it to decrypt STDIN to STDOUT."""
+    return _run_gpg_with_source(source, buf, [
+        '--decrypt', '--recipient', FLAGS.id, '--trust-model', 'always',
+        '--armor'
+    ])
+
+
+def _get_key(random_source):
+    from Crypto.PublicKey import RSA
+    return RSA.generate(4096, random_source)
+
+
+def _run_gpg_with_source(source, buf, cmd):
+    gpg_key = get_gpg_key(source)
+    inp = buf.read() if buf else None
     with tempfile.TemporaryDirectory() as tmpdirname:
-        gpg_import = subprocess.Popen(
-            ['gpg', '--homedir', tmpdirname, '--import'],
+        subprocess.run(['gpg', '--homedir', tmpdirname, '--import'],
+                       input=gpg_key,
+                       check=True)
+        gpg = subprocess.Popen(
+            ['gpg', '--homedir', tmpdirname] + cmd,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE)
-        gpg_import.communicate(gpg_key)
-        gpg_decrypt = subprocess.Popen([
-            'gpg', '--homedir', tmpdirname, cmd, '--recipient', FLAGS.id,
-            '--trust-model', 'always', '--armor'
-        ],
-                                       stdin=sys.stdin,
-                                       stdout=sys.stdout)
-        gpg_decrypt.communicate()
-    return b''
+        return gpg.communicate(inp)[0]
