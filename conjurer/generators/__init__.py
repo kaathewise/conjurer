@@ -1,8 +1,13 @@
+"""Contains all commands that are making use of the pseudorandom source."""
+
 from . import gpg
 
-from collections import OrderedDict
+import click
 
-modes = OrderedDict([('gpg-pem', gpg.get_pem), ('gpg-key', gpg.get_gpg_key),
-                     ('gpg-public', gpg.get_public_key),
-                     ('gpg-encrypt', gpg.encrypt), ('gpg-decrypt',
-                                                    gpg.decrypt)])
+commands = [
+    ('gpg-pem', gpg.pem),
+    ('gpg-key', gpg.key),
+    ('gpg-public', gpg.public),
+    ('gpg-encrypt', gpg.encrypt),
+    ('gpg-decrypt', gpg.decrypt),
+]

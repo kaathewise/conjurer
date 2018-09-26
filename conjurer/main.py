@@ -1,43 +1,41 @@
+import click
 import sys
 
-from pseudorandom_source import get_source
 from generators import *
-
-from absl import app
-from absl import flags
-
-FLAGS = flags.FLAGS
-flags.DEFINE_string(
-    'passphrase',
-    None,
-    'Passphrase for generation. It is the main source of enthropy. (required)',
-    short_name='p')
-flags.mark_flag_as_required('passphrase')
-flags.DEFINE_string(
-    'id',
-    '', 'Username, UserId, or any kind of virtual identity.'
-    ' Used for generation, but also as the identity for certificates.',
-    short_name='i')
-
-flags.DEFINE_enum(
-    'mode',
-    None,
-    modes.keys(),
-    'The part of the identity that needs to be created. (required)\n' +
-    "\n".join("%-15s: %s" % (k, v.__doc__) for k, v in modes.items()),
-    short_name='m')
-flags.mark_flag_as_required('mode')
+from pseudorandom_source import get_source
 
 
-def _main(argv):
-    del argv  # Unused
+@click.group()
+@click.option(
+    '--passphrase',
+    '-p',
+    help='Passphrase for generation. It is the main source of enthropy.')
+@click.option(
+    '--user',
+    '-u',
+    help=
+    'Username, UserId, or any kind of virtual identity. Used for generation, but also as the identity for certificates.'
+)
+@click.pass_context
+def cli(ctx, passphrase, user):
+    ctx.obj = LazyOptionProvider(passphrase, user)
 
-    seedphrase = '%s$%s' % (FLAGS.passphrase, FLAGS.id)
-    print(seedphrase)
-    method = gpg.modes[FLAGS.gpg_mode]
-    s = get_source(seedphrase)
-    sys.stdout.buffer.write(method(s, sys.stdin.buffer))
+
+for name, cmd in commands:
+    cli.add_command(cmd, name=name)
 
 
-if __name__ == '__main__':
-    app.run(_main)
+class LazyOptionProvider:
+    def __init__(self, passphrase, user):
+        self.passphrase = passphrase
+        self.user = user
+        self.source = None
+
+    def __call__(self):
+        if not self.source:
+            passphrase = self.passphrase or click.prompt(
+                'Passphrase', prompt_suffix=': 🔑', hide_input=True, err=True)
+            self.user = self.user or click.prompt('User', err=True)
+            self.source = get_source('%s$%s' % (passphrase, self.user))
+            del self.passphrase
+        return self

@@ -1,14 +1,17 @@
+"""Module providing a deterministic pseudorandom source."""
+
 from struct import pack
 
 from Crypto.Hash import SHA3_512
 
 
 def get_source(passphrase):
-    seed = get_seed_argon2(passphrase)
-    return FastPseudorandom(seed).read
+    """Generate a pseudorandom source seeded by the given passphrase."""
+    seed = _get_seed_argon2(passphrase)
+    return _FastPseudorandom(seed).read
 
 
-def get_seed_argon2(passphrase):
+def _get_seed_argon2(passphrase):
     """
     Given a string passphrase, generates a 64-byte seed.
 
