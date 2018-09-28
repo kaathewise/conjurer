@@ -5,9 +5,9 @@ from . import gpg
 import click
 
 commands = [
-    ('gpg-pem', gpg.pem),
-    ('gpg-key', gpg.key),
-    ('gpg-public', gpg.public),
-    ('gpg-encrypt', gpg.encrypt),
-    ('gpg-decrypt', gpg.decrypt),
+    gpg.pem,
+    gpg.key,
+    gpg.public,
+    gpg.encrypt,
+    gpg.decrypt,
 ]
